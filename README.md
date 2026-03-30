@@ -61,7 +61,7 @@ sudo apt update && sudo apt install -y ansible sshpass git
 
 1. Download or clone this repository
 ```
-git clone https://github.com/vitabaks/postgresql_cluster.git
+git clone https://github.com/haykzhamharyan/pgcluster-ha
 ```
 
 2. Export DIGITALOCEAN_TOKEN to your environment
@@ -94,3 +94,7 @@ cd .. && ansible-playbook playbook.yml -i inventory.ini --ask-vault-pass
 ```
 > :heavy_exclamation_mark: Default vault pass is 'root12'. You should create your vault.yml with root_password: and postgres_password: .
 
+## Validation 
+Consul DNS
+dig @127.0.0.1 -p 8600 master.postgres.service.consul +short
+dig @127.0.0.1 -p 8600 replica.postgres.service.consul +short
