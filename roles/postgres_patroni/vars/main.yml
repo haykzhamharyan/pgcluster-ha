@@ -1,0 +1,2 @@
+postgres_version: 16
+consul_version: "1.22.5"

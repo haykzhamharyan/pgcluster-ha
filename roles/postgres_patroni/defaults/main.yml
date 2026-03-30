@@ -1,0 +1,6 @@
+postgres_version: 14
+patroni_scope: postgres-cluster
+patroni_namespace: /service/
+
+patroni_rest_port: 8008
+postgres_port: 5432

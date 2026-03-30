@@ -1,0 +1,35 @@
+- name: Setup VMs
+  hosts: vms
+  vars_files:
+    - vault.yml
+  become: yes
+  roles:
+    - vm_setup
+
+- name: Setup consul
+  hosts:
+    - consul1
+    - consul2
+    - consul3
+  vars_files:
+    - vault.yml
+  become: yes
+  roles:
+    - consul
+
+- name: Setup PostgreSQL Cluster with Patroni
+  hosts: pg_master:pg_replica
+  vars_files:
+    - vault.yml
+  become: yes
+  roles:
+    - postgres_patroni
+
+- name: Setup haproxy
+  hosts: haproxy
+  vars_files:
+    - vault.yml
+  become: yes
+  roles:
+    - haproxy
+

@@ -1,0 +1,6 @@
+server = false
+data_dir = "/opt/consul"
+bind_addr = "{{ ansible_host }}"
+client_addr = "127.0.0.1"
+
+retry_join = [{% for host in groups['consul'] %}"{{ hostvars[host].ansible_host }}"{% if not loop.last %}, {% endif %}{% endfor %}]

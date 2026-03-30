@@ -1,0 +1,177 @@
+- name: Install dependencies
+  package:
+    name: unzip,curl
+    state: present
+  become: yes
+
+- name: Download Consul
+  get_url:
+    url: "https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{ consul_version }}_linux_amd64.zip"
+    dest: /tmp/consul.zip
+    mode: '0644'
+
+- name: Unzip Consul
+  unarchive:
+    src: /tmp/consul.zip
+    dest: /usr/local/bin/
+    remote_src: yes
+  become: yes
+
+- name: Create Consul user
+  user:
+    name: consul
+    shell: /bin/false
+    system: yes
+  become: yes
+
+- name: Ensure Consul data directory exists
+  file:
+    path: /opt/consul
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0750'
+
+- name: Create Consul directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0755'
+  loop:
+    - /etc/consul.d
+    - /var/lib/consul
+  become: yes
+
+- name: Install Consul client config
+  template:
+    src: consul-client.hcl.j2
+    dest: /etc/consul.d/client.hcl
+
+- name: Create systemd service for Consul
+  copy:
+    dest: /etc/systemd/system/consul.service
+    content: |
+      [Unit]
+      Description=Consul Agent
+      Requires=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=consul
+      Group=consul
+      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+      Restart=on-failure
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+  become: yes
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+  become: yes
+
+- name: Enable and start Consul
+  systemd:
+    name: consul
+    enabled: yes
+    state: started
+
+- name: Wait for Consul cluster to be ready
+  uri:
+    url: "http://{{ item }}:8500/v1/status/leader"
+    status_code: 200
+  register: consul_check
+  retries: 10
+  delay: 5
+  until: consul_check.status == 200 and consul_check.json != ""
+  loop: "{{ groups['consul'] }}"
+
+- name: Prevent services from auto-starting
+  copy:
+    dest: /usr/sbin/policy-rc.d
+    content: |
+      #!/bin/sh
+      exit 101
+    mode: '0755'
+
+- name: Install dependencies
+  package:
+    name:
+      - python3
+      - python3-venv
+      - python3-pip
+      - "postgresql-{{ postgres_version }}"
+      - "postgresql-client-{{ postgres_version }}"
+    state: present
+    update_cache: yes
+
+- name: Re-enable service start
+  file:
+    path: /usr/sbin/policy-rc.d
+    state: absent
+
+- name: Create Patroni virtual environment
+  command: python3 -m venv /opt/patroni
+
+- name: Install Patroni and dependencies
+  command: >
+    /opt/patroni/bin/pip install
+    patroni[consul]
+    psycopg2-binary
+
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0755'
+  loop:
+    - /etc/patroni
+
+- name: Ensure PostgreSQL data directory exists
+  file:
+    path: /var/lib/postgresql/data
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0700'
+
+- name: Deploy Patroni config
+  template:
+    src: patroni.yml.j2
+    dest: /etc/patroni/patroni.yml
+    owner: postgres
+    group: postgres
+    mode: '0644'
+
+- name: Create systemd service
+  copy:
+    dest: /etc/systemd/system/patroni.service
+    content: |
+      [Unit]
+      Description=Patroni PostgreSQL HA
+      After=network.target
+
+      [Service]
+      User=postgres
+      Group=postgres
+      ExecStart=/opt/patroni/bin/patroni /etc/patroni/patroni.yml
+      Restart=always
+      Environment="PATH=/opt/patroni/bin:/usr/bin:/bin"
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Enable and start Patroni
+  systemd:
+    name: patroni
+    enabled: yes
+    state: started
+

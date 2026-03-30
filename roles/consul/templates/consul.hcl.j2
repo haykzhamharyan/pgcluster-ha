@@ -1,0 +1,19 @@
+datacenter = "dc1"
+data_dir = "/opt/consul"
+node_name = "{{ inventory_hostname }}"
+
+server = true
+bootstrap_expect = 3
+
+bind_addr = "{{ ansible_host }}"
+advertise_addr = "{{ ansible_host }}"
+
+client_addr = "0.0.0.0"
+
+retry_join = [{% for host in groups['consul'] %}"{{ hostvars[host].ansible_host }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+
+ui = true
+
+ports {
+  dns = 8600
+}

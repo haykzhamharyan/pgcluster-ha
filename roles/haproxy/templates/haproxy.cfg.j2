@@ -1,0 +1,32 @@
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    daemon
+    maxconn 2000
+
+defaults
+    log global
+    mode tcp
+    option tcplog
+    timeout connect 5s
+    timeout client  1m
+    timeout server  1m
+
+frontend postgres_front
+    bind *:5432
+    default_backend postgres_back
+
+backend postgres_back
+    option httpchk GET /health
+    http-check expect status 200
+    default-server inter 3s fall 3 rise 2
+
+{% for host in groups['pg_master'] + groups['pg_replica'] %}
+server {{ host }} {{ host }}:5432 check port 8008 inter 3s fall 3 rise 2
+{% endfor %}
+
+listen stats
+    bind *:8404
+    mode http
+    stats enable
+    stats uri /
